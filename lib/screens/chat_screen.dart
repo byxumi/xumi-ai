@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,9 +9,11 @@ import '../theme/app_theme.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/conversation_drawer.dart';
 import '../widgets/message_bubble.dart';
+import '../widgets/model_avatar.dart';
+import '../widgets/model_picker.dart';
 import 'settings_screen.dart';
 
-/// 主聊天页面
+/// 主聊天页面（v2 消费级风格：首页欢迎 + 灵感话题 + 模型大厅）
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -52,14 +56,13 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Expanded(
             child: messages.isEmpty
-                ? _EmptyChat(
-                    model: app.activeModel,
-                    hasApi: app.hasApi,
-                    generating: app.isGenerating,
+                ? _HomeView(
+                    app: app,
                     onSubmit: (t) => app.sendMessage(t),
-                    onOpenSettings: () =>
-                        Navigator.push(context,
-                            MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                    onOpenSettings: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const SettingsScreen())),
                   )
                 : _MessageList(
                     messages: messages,
@@ -89,116 +92,76 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       titleSpacing: 0,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '须弥AI',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          if (model.isNotEmpty)
-            Row(
+      title: GestureDetector(
+        onTap: () => showModelPicker(context, app),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    AppColors.brandGradientStart,
+                    AppColors.brandGradientEnd,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              alignment: Alignment.center,
+              child:
+                  const Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+            ),
+            const SizedBox(width: 9),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    shape: BoxShape.circle,
-                  ),
+                const Text(
+                  '须弥AI',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Text(
-                    model,
-                    style: TextStyle(fontSize: 11, color: scheme.outline),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                if (model.isNotEmpty)
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: AppColors.accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 130),
+                        child: Text(
+                          model,
+                          style:
+                              TextStyle(fontSize: 11, color: scheme.outline),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Icon(Icons.expand_more,
+                          size: 13, color: scheme.outline),
+                    ],
                   ),
-                ),
               ],
             ),
-        ],
+          ],
+        ),
       ),
       actions: [
-        // 模型快速切换（下拉）
         IconButton(
-          icon: const Icon(Icons.auto_awesome, size: 20),
-          tooltip: '切换模型',
-          onPressed: () => _showModelPicker(context, app),
-        ),
-        IconButton(
-          icon: const Icon(Icons.settings),
+          icon: const Icon(Icons.settings_outlined),
           tooltip: '设置',
           onPressed: () => Navigator.push(
               context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
         ),
       ],
-    );
-  }
-
-  void _showModelPicker(BuildContext context, AppState app) {
-    final profile = app.activeProfile;
-    final models = profile?.models ?? [];
-    if (profile == null || models.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(profile == null ? '请先在设置中添加接口' : '该接口暂无可切换模型'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(
-                '选择模型',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: models.length,
-                itemBuilder: (context, i) {
-                  final m = models[i];
-                  final selected = m == app.activeModel;
-                  return ListTile(
-                    leading: Icon(
-                      selected ? Icons.auto_awesome : Icons.view_in_ar,
-                      size: 20,
-                      color: selected
-                          ? Theme.of(context).colorScheme.primary
-                          : null,
-                    ),
-                    title: Text(m, style: const TextStyle(fontSize: 15)),
-                    trailing: selected
-                        ? Icon(Icons.check,
-                            color: Theme.of(context).colorScheme.primary)
-                        : null,
-                    onTap: () {
-                      app.selectModel(m);
-                      Navigator.pop(context);
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -281,139 +244,428 @@ class _ScrollToBottomButton extends StatelessWidget {
   }
 }
 
-/// 空态聊天页（欢迎 + 快捷建议）
-class _EmptyChat extends StatelessWidget {
-  final String model;
-  final bool hasApi;
-  final bool generating;
+/// 灵感话题数据
+class _InspirationTopic {
+  final String emoji;
+  final String title;
+  final String prompt;
+  const _InspirationTopic(this.emoji, this.title, this.prompt);
+}
+
+/// 首页欢迎视图（无消息时的空态，消费级风格）
+class _HomeView extends StatefulWidget {
+  final AppState app;
   final ValueChanged<String> onSubmit;
   final VoidCallback onOpenSettings;
-  const _EmptyChat({
-    required this.model,
-    required this.hasApi,
-    required this.generating,
+  const _HomeView({
+    required this.app,
     required this.onSubmit,
     required this.onOpenSettings,
   });
 
-  static const _suggestions = [
-    '用简单的语言解释什么是量子纠缠',
-    '帮我写一首关于夏天的短诗',
-    '给出一周健身计划',
-    'Explain how photosynthesis works in one paragraph',
+  static const _topics = [
+    _InspirationTopic('✍️', '帮我写文案', '帮我写一条更有吸引力的产品宣传文案，产品是：'),
+    _InspirationTopic('🌍', '翻译小助手', '请把下面这句话翻译成英文，并简短说明语气：'),
+    _InspirationTopic('💻', '编程助手', '帮我写一段简洁的代码，实现：'),
+    _InspirationTopic('📖', '科普达人', '用最通俗的话给我解释：'),
+    _InspirationTopic('🧠', '头脑风暴', '围绕这个主题给我 10 个有趣的创意：'),
+    _InspirationTopic('📝', '文章总结', '把下面这段内容总结成 3 个要点：'),
   ];
+
+  @override
+  State<_HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<_HomeView> {
+  /// 换一批的 seed（0 表示原始顺序）
+  int _topicSeed = 0;
+
+  /// 每次打开随机一句轻松的问候语
+  late final String _subtitle = const [
+    '今天想聊点什么？写写、翻译、查资料，都可以问我～',
+    '随便聊聊也行，写作、翻译、编程、科普我都行～',
+    '想聊什么都可以，我超会接话的～',
+  ][Random().nextInt(3)];
+
+  AppState get app => widget.app;
+  ValueChanged<String> get onSubmit => widget.onSubmit;
+  VoidCallback get onOpenSettings => widget.onOpenSettings;
+
+  /// 按当前 seed 重新洗牌灵感话题
+  List<_InspirationTopic> get _topics {
+    if (_topicSeed == 0) return _HomeView._topics;
+    final copy = List<_InspirationTopic>.from(_HomeView._topics);
+    copy.shuffle(Random(_topicSeed));
+    return copy;
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasApi = app.hasApi;
+    final model = app.activeModel;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo
+          // ===== 欢迎渐变 Hero =====
           Container(
-            width: 72,
-            height: 72,
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [AppColors.brandGradientStart, AppColors.brandGradientEnd],
+                colors: [
+                  AppColors.brandGradientStart,
+                  AppColors.brandGradientEnd,
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.25),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
+                  color: AppColors.primary.withValues(alpha: 0.28),
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
-            alignment: Alignment.center,
-            child: const Icon(Icons.auto_awesome, color: Colors.white, size: 34),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            '须弥AI',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: scheme.onSurface,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Hi，我是须弥AI 👋',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _subtitle,
+                  style: const TextStyle(
+                      color: Colors.white70, fontSize: 13.5),
+                ),
+                const SizedBox(height: 16),
+                // 当前模型 pill（点击切换）
+                GestureDetector(
+                  onTap: () => showModelPicker(context, app),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.auto_awesome,
+                            color: Colors.white, size: 16),
+                        const SizedBox(width: 7),
+                        Text(
+                          model.isNotEmpty ? model : '选择模型',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.expand_more,
+                            color: Colors.white70, size: 17),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            hasApi ? '你好，我是须弥AI，有什么可以帮你？' : '请先配置 API 接口开始对话',
-            style: TextStyle(fontSize: 15, color: scheme.outline),
-            textAlign: TextAlign.center,
-          ),
-          if (model.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '当前模型：$model',
-                style: TextStyle(fontSize: 12, color: scheme.primary),
+          const SizedBox(height: 24),
+
+          if (!hasApi) ...[
+            // ===== 未配置接口引导 =====
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? scheme.surfaceContainer : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: scheme.outlineVariant.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.wifi_tethering,
+                      size: 40, color: scheme.primary.withValues(alpha: 0.7)),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '还没接上 AI 呢',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '在设置里接一个 OpenAI 兼容接口（DeepSeek / 豆包 / 自定义）就能开聊啦',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        color: scheme.outline,
+                        height: 1.5),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: onOpenSettings,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('去接一个'),
+                  ),
+                ],
               ),
             ),
-          const SizedBox(height: 32),
-          if (!hasApi)
-            FilledButton.icon(
-              onPressed: onOpenSettings,
-              icon: const Icon(Icons.settings, size: 18),
-              label: const Text('去配置接口'),
-            )
-          else
-            ..._suggestions.map((s) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _SuggestionChip(
-                    text: s,
-                    onSubmit: onSubmit,
-                    disabled: generating,
+          ] else ...[
+            // ===== 灵感话题 =====
+            Row(
+              children: [
+                Text(
+                  '灵感话题',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: scheme.onSurface),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => setState(() => _topicSeed++),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: scheme.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.shuffle, size: 13, color: scheme.primary),
+                        const SizedBox(width: 3),
+                        Text(
+                          '换一批',
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              color: scheme.primary,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
                   ),
-                )),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 2.35,
+              children: [
+                for (final t in _topics)
+                  _TopicCard(topic: t, onSubmit: onSubmit),
+              ],
+            ),
+            const SizedBox(height: 24),
+            // ===== 模型大厅 =====
+            Row(
+              children: [
+                Text(
+                  '模型大厅',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: scheme.onSurface),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => showModelPicker(context, app),
+                  child: Text(
+                    '全部 ›',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _ModelHall(app: app),
+          ],
         ],
       ),
     );
   }
 }
 
-class _SuggestionChip extends StatelessWidget {
-  final String text;
+/// 灵感话题卡片
+class _TopicCard extends StatelessWidget {
+  final _InspirationTopic topic;
   final ValueChanged<String> onSubmit;
-  final bool disabled;
-  const _SuggestionChip({
-    required this.text,
-    required this.onSubmit,
-    required this.disabled,
-  });
+  const _TopicCard({required this.topic, required this.onSubmit});
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: Theme.of(context).colorScheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(14),
+      color: isDark ? scheme.surfaceContainer : Colors.white,
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: disabled ? null : () => onSubmit(text),
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => onSubmit(topic.prompt),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
+              Text(topic.emoji, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  text,
+                  topic.title,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Icon(Icons.north_east,
-                  size: 16, color: Theme.of(context).colorScheme.primary),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 模型大厅：横向模型卡片（跨接口）
+class _ModelHall extends StatelessWidget {
+  final AppState app;
+  const _ModelHall({required this.app});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeProfileId = app.settings.activeProfileId;
+    final activeModel = app.activeModel;
+
+    // 收集所有接口下的所有模型
+    final entries = <({String profileId, String profileName, String model})>[];
+    for (final p in app.profiles) {
+      for (final m in p.models) {
+        entries.add((profileId: p.id, profileName: p.name, model: m));
+      }
+    }
+
+    if (entries.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: isDark ? scheme.surfaceContainer : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.extension, color: scheme.outlineVariant),
+            const SizedBox(width: 10),
+            Text(
+              '还没添加模型，去设置里加几个吧',
+              style: TextStyle(fontSize: 13, color: scheme.outline),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 112,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        itemCount: entries.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, i) {
+          final e = entries[i];
+          final selected =
+              e.profileId == activeProfileId && e.model == activeModel;
+          return GestureDetector(
+            onTap: () async {
+              await app.selectProfile(e.profileId);
+              await app.selectModel(e.model);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context)
+                  ..clearSnackBars()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text('已切换：${e.model}'),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+              }
+            },
+            child: Container(
+              width: 138,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? scheme.surfaceContainer : Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: selected
+                      ? AppColors.primary
+                      : scheme.outlineVariant.withValues(alpha: 0.35),
+                  width: selected ? 1.6 : 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      ModelAvatar(model: e.model, size: 30),
+                      const Spacer(),
+                      if (selected)
+                        const Icon(Icons.check_circle,
+                            color: AppColors.primary, size: 17),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    e.model,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    e.profileName,
+                    style: TextStyle(fontSize: 10.5, color: scheme.outline),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

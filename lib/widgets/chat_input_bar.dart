@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../provider/app_state.dart';
+import '../theme/app_theme.dart';
+import 'model_picker.dart';
 
-/// 底部输入栏（含发送 / 停止按钮）
+/// 底部输入栏（模型快捷切换 + 发送 / 停止）
 class ChatInputBar extends StatefulWidget {
   const ChatInputBar({super.key});
 
@@ -36,7 +38,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        padding: const EdgeInsets.fromLTRB(10, 8, 12, 12),
         decoration: BoxDecoration(
           color: isDark
               ? scheme.surface.withValues(alpha: 0.95)
@@ -52,6 +54,16 @@ class _ChatInputBarState extends State<ChatInputBar> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            // 模型快捷切换
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: _ModelShortcutChip(
+                hasApi: app.hasApi,
+                model: app.activeModel,
+                onTap: () => showModelPicker(context, app),
+              ),
+            ),
+            const SizedBox(width: 8),
             // 输入框
             Expanded(
               child: TextField(
@@ -61,7 +73,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 textInputAction: TextInputAction.newline,
                 style: TextStyle(fontSize: 15.5, color: scheme.onSurface),
                 decoration: InputDecoration(
-                  hintText: app.hasApi ? '输入消息…' : '请先在「设置」配置 API',
+                  hintText: app.hasApi ? '随便说点什么…' : '先在设置里接个接口吧',
                   hintStyle: TextStyle(color: scheme.outline),
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
@@ -83,7 +95,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   : _RoundButton(
                       key: const ValueKey('send'),
                       icon: Icons.send_rounded,
-                      color: scheme.primary,
+                      gradient: const [
+                        AppColors.brandGradientStart,
+                        AppColors.brandGradientEnd,
+                      ],
                       onTap: _send,
                     ),
             ),
@@ -94,28 +109,108 @@ class _ChatInputBarState extends State<ChatInputBar> {
   }
 }
 
-class _RoundButton extends StatelessWidget {
-  final IconData icon;
-  final Color color;
+/// 输入框左侧的模型快捷按钮（✨ + 模型名）
+class _ModelShortcutChip extends StatelessWidget {
+  final bool hasApi;
+  final String model;
   final VoidCallback onTap;
-  const _RoundButton({
-    super.key,
-    required this.icon,
-    required this.color,
+  const _ModelShortcutChip({
+    required this.hasApi,
+    required this.model,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: isDark
+              ? scheme.surfaceContainerHigh
+              : scheme.primary.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: hasApi
+                ? AppColors.primary.withValues(alpha: 0.25)
+                : scheme.outlineVariant.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.auto_awesome,
+              size: 15,
+              color: hasApi ? AppColors.primary : scheme.outlineVariant,
+            ),
+            const SizedBox(width: 4),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 74),
+              child: Text(
+                model.isNotEmpty ? model : '模型',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: hasApi ? scheme.onSurface : scheme.outline,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(Icons.expand_more,
+                size: 14,
+                color: hasApi ? scheme.onSurfaceVariant : scheme.outline),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoundButton extends StatelessWidget {
+  final IconData icon;
+  final Color? color;
+  final List<Color>? gradient;
+  final VoidCallback onTap;
+  const _RoundButton({
+    super.key,
+    required this.icon,
+    this.color,
+    this.gradient,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    BoxDecoration decoration;
+    if (gradient != null) {
+      decoration = BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradient!,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        shape: BoxShape.circle,
+      );
+    } else {
+      decoration = BoxDecoration(color: color!, shape: BoxShape.circle);
+    }
     return Material(
-      color: color,
       shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(13),
-          child: Icon(icon, color: Colors.white, size: 22),
+      child: Ink(
+        decoration: decoration,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(13),
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
         ),
       ),
     );

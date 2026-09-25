@@ -203,8 +203,9 @@ class _EmptyList extends StatelessWidget {
           Icon(Icons.forum, size: 44, color: scheme.outlineVariant),
           const SizedBox(height: 12),
           Text(
-            '还没有对话',
-            style: TextStyle(color: scheme.outline, fontSize: 14),
+            '还没有聊天记录，点「新建对话」开聊吧',
+            style: TextStyle(color: scheme.outline, fontSize: 13),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

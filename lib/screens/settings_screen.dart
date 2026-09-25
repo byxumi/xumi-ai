@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/ai_profile.dart';
 import '../provider/app_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/model_avatar.dart';
 
 /// 设置页：AI 接口档案管理与主题切换
 class SettingsScreen extends StatelessWidget {
@@ -32,11 +33,11 @@ class SettingsScreen extends StatelessWidget {
           // API 档案
           Row(
             children: [
-              Text('API 接口', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: scheme.onSurface)),
+              Text('我的接口', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: scheme.onSurface)),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.add, size: 20),
-                tooltip: '新增接口',
+                tooltip: '添加接口',
                 onPressed: () => _openProfileEditor(context, app),
               ),
             ],
@@ -81,7 +82,7 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('删除接口'),
-        content: Text('确定删除接口「${profile.name}」吗？'),
+        content: Text('确定把「${profile.name}」删掉吗？'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
           FilledButton(
@@ -144,7 +145,7 @@ class _ModelOverviewCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            profile != null ? profile.name : '请添加一个 API 接口',
+            profile != null ? profile.name : '去添加一个接口吧',
             style: const TextStyle(color: Colors.white70, fontSize: 13),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -182,21 +183,31 @@ class _ProfileCard extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
           child: Row(
             children: [
-              // 选中指示
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: active ? scheme.primary : scheme.outlineVariant,
-                    width: 2,
+              // 模型头像（按模型自动配色）
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ModelAvatar(
+                    model: profile.models.isNotEmpty
+                        ? profile.models.first
+                        : profile.name,
+                    size: 38,
                   ),
-                  color: active ? scheme.primary : Colors.transparent,
-                ),
-                child: active
-                    ? const Icon(Icons.check, color: Colors.white, size: 14)
-                    : null,
+                  if (active)
+                    Positioned(
+                      right: -4,
+                      bottom: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check,
+                            color: Colors.white, size: 11),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -268,12 +279,12 @@ class _EmptyProfiles extends StatelessWidget {
           Icon(Icons.wifi, size: 38, color: scheme.outlineVariant),
           const SizedBox(height: 12),
           Text(
-            '还没有配置 API 接口',
+            '还没添加接口呢',
             style: TextStyle(fontSize: 15, color: scheme.onSurface),
           ),
           const SizedBox(height: 4),
           Text(
-            '添加一个 OpenAI 兼容接口即可开始对话',
+            '接一个 OpenAI 兼容接口（DeepSeek / 豆包 / 自定义）就能开聊啦',
             style: TextStyle(fontSize: 12, color: scheme.outline),
             textAlign: TextAlign.center,
           ),
@@ -405,12 +416,12 @@ class _AboutCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '版本 1.0.0 · 基于 OpenAI 兼容 API',
+            '版本 2.1.0 · 接入你自己的 AI 接口',
             style: TextStyle(fontSize: 12, color: scheme.outline),
           ),
           const SizedBox(height: 4),
           Text(
-            '本期为测试版本，请自行配置接口后使用。生成内容由模型提供，仅供参考。',
+            '轻快好用的多模型聊天助手：一个应用，自由切换 DeepSeek / 豆包 / 自定义接口。生成内容由模型提供，仅供参考。',
             style: TextStyle(fontSize: 12, color: scheme.outline, height: 1.5),
           ),
         ],
@@ -552,7 +563,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _fieldLabel(scheme, '名称'),
+          _fieldLabel(scheme, '名字'),
           const SizedBox(height: 8),
           TextField(
             controller: _nameCtrl,
@@ -562,7 +573,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          _fieldLabel(scheme, 'Base URL'),
+          _fieldLabel(scheme, '接口地址'),
           const SizedBox(height: 8),
           TextField(
             controller: _urlCtrl,
@@ -574,11 +585,11 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            '需以 /v1 结尾，系统会自动拼接 /chat/completions',
+            '地址通常以 /v1 结尾，会自动拼接 /chat/completions',
             style: TextStyle(fontSize: 11, color: scheme.outline),
           ),
           const SizedBox(height: 20),
-          _fieldLabel(scheme, 'API Key'),
+          _fieldLabel(scheme, '密钥'),
           const SizedBox(height: 8),
           TextField(
             controller: _keyCtrl,
@@ -591,7 +602,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
           const SizedBox(height: 20),
           Row(
             children: [
-              _fieldLabel(scheme, '模型列表'),
+              _fieldLabel(scheme, '可用模型'),
               const Spacer(),
               TextButton.icon(
                 onPressed: _busy ? null : () => _fetchModels(app),
