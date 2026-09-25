@@ -29,6 +29,22 @@ class _ChatInputBarState extends State<ChatInputBar> {
     context.read<AppState>().sendMessage(text);
   }
 
+  void _showVoicePlaceholder(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🎙️ 语音输入'),
+        content: const Text('语音输入马上就来啦，先用打字聊天吧～'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
@@ -82,6 +98,14 @@ class _ChatInputBarState extends State<ChatInputBar> {
               ),
             ),
             const SizedBox(width: 8),
+            // 语音输入入口（麦克风，占位）
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: _MicButton(
+                onTap: () => _showVoicePlaceholder(context),
+              ),
+            ),
+            const SizedBox(width: 6),
             // 发送 / 停止
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
@@ -166,6 +190,29 @@ class _ModelShortcutChip extends StatelessWidget {
                 size: 14,
                 color: hasApi ? scheme.onSurfaceVariant : scheme.outline),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 麦克风按钮（语音输入入口占位）
+class _MicButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _MicButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(11),
+          child: Icon(Icons.mic_none, size: 20, color: scheme.onSurfaceVariant),
         ),
       ),
     );

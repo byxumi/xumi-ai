@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 
 import '../models/ai_profile.dart';
 import '../models/chat_conversation.dart';
+import '../services/agent_service.dart';
 import '../services/chat_store.dart';
+import '../services/memory_store.dart';
 import '../services/openai_client.dart';
 import '../services/settings_service.dart';
 
@@ -13,6 +15,7 @@ class AppState extends ChangeNotifier {
   final SettingsService settings;
   final ChatStore store;
   final OpenAIClient api = OpenAIClient();
+  final MemoryStore memory = MemoryStore();
 
   // ---------- 档案 / 会话 ----------
   List<AiProfile> _profiles = [];
@@ -50,11 +53,26 @@ class AppState extends ChangeNotifier {
   /// 是否有可用的接口配置
   bool get hasApi => activeProfile != null && activeModel.isNotEmpty;
 
+  /// Agent 模式开关（走工具调用 + 记忆的 Agent 通道）
+  bool get agentEnabled => settings.agentEnabled;
+  Future<void> setAgentEnabled(bool value) async {
+    await settings.saveAgentEnabled(value);
+    notifyListeners();
+  }
+
+  /// 联网搜索 Key（预留，模型自带联网时无需填写）
+  String get searchApiKey => settings.searchApiKey;
+  Future<void> setSearchApiKey(String value) async {
+    await settings.saveSearchApiKey(value);
+    notifyListeners();
+  }
+
   // ---------- 初始化 ----------
 
   Future<void> init() async {
     await settings.load();
     await store.load();
+    await memory.init();
     _profiles = [...settings.profiles];
     _conversations = await store.loadConversations();
     // 恢复上次会话
@@ -233,6 +251,13 @@ class AppState extends ChangeNotifier {
     }
     final model = activeModel;
 
+    // Agent 模式：工具调用 + 记忆（可在设置里开关）
+    if (agentEnabled) {
+      await _sendAgent(
+          convId, assistantMsg.id, profile, model, history, text.trim());
+      return;
+    }
+
     await api.streamChat(
       profile: profile,
       model: model,
@@ -270,6 +295,102 @@ class AppState extends ChangeNotifier {
         _finishError(assistantMsg.id, convId, err);
       },
     );
+  }
+
+  /// 按会话缓存的 Agent（保持上下文连续性）
+  final Map<String, AgentService> _agents = {};
+
+  /// Agent 模式发送：走 dart_agent_core（工具调用 + 记忆 + 上下文）
+  Future<void> _sendAgent(
+    String convId,
+    String assistantMsgId,
+    AiProfile profile,
+    String model,
+    List<ChatMessage> history,
+    String userText,
+  ) async {
+    // 按会话创建/复用 Agent，保持上下文
+    final agent = _agents.putIfAbsent(
+      convId,
+      () => AgentService(
+        profile: profile,
+        model: model,
+        sessionId: convId,
+        state: AgentState(sessionId: convId),
+        memory: memory,
+      ),
+    );
+
+    // 预注入本会话历史（仅最近若干条，控制上下文体积）
+    final recent = history.length > 10
+        ? history.sublist(history.length - 10)
+        : history;
+    final existingKeys = <String>{};
+    for (final m in agent.state.history.messages) {
+      existingKeys.add('u:' + m.id);
+    }
+    for (final m in recent) {
+      if (m.role == ChatRole.user && m.content.trim().isNotEmpty) {
+        final key = 'u:' + m.id;
+        if (existingKeys.contains(key)) continue;
+        existingKeys.add(key);
+        agent.state.history.messages.add(UserMessage.text(m.content.trim()));
+      }
+    }
+
+    final toolNames = <String>{};
+    final sb = StringBuffer();
+    try {
+      await for (final ev in agent.chatStream(userText)) {
+        switch (ev) {
+          case AgentTextEvent():
+            sb.write(ev.text);
+            final idx = _messages[convId]!
+                .indexWhere((m) => m.id == assistantMsgId);
+            if (idx >= 0) {
+              _messages[convId]![idx] =
+                  _messages[convId]![idx].copyWith(content: sb.toString());
+              writeThrough(convId);
+            }
+            notifyListeners();
+          case AgentToolEvent():
+            if (ev.toolName.isNotEmpty) toolNames.add(ev.toolName);
+          case AgentFinishedEvent():
+            final idx = _messages[convId]!
+                .indexWhere((m) => m.id == assistantMsgId);
+            if (idx >= 0) {
+              _messages[convId]![idx] = _messages[convId]![idx].copyWith(
+                content: ev.finalText.isEmpty ? '（无回复）' : ev.finalText,
+                isStreaming: false,
+                isError: false,
+                model: model,
+              );
+            }
+        }
+      }
+      // 工具摘要附加到回复末尾（轻松语气）
+      if (toolNames.isNotEmpty && sb.isNotEmpty) {
+        final idx = _messages[convId]!
+            .indexWhere((m) => m.id == assistantMsgId);
+        if (idx >= 0) {
+          final content = _messages[convId]![idx].content;
+          final hint = '\n\n🔧 这次用了：' + toolNames.join('、');
+          if (!content.endsWith(hint)) {
+            _messages[convId]![idx] =
+                _messages[convId]![idx].copyWith(content: content + hint);
+          }
+        }
+      }
+      await agent.saveState();
+    } catch (e) {
+      _finishError(assistantMsgId, convId, 'Agent 出错了：' + e.toString());
+    } finally {
+      _streamed = '';
+      _isGenerating = false;
+      writeThrough(convId);
+      _touchConversation(convId);
+      notifyListeners();
+    }
   }
 
   void _finishError(String msgId, String convId, String err) {
