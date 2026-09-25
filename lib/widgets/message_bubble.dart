@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/chat_conversation.dart';
 import '../theme/app_theme.dart';
+import 'model_avatar.dart';
 
-/// 聊天气泡（用户 / AI 两套样式）
+/// 聊天气泡（用户 / AI 两套样式，v2 消费级风格）
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
   const MessageBubble({super.key, required this.message});
@@ -41,6 +42,13 @@ class _UserBubble extends StatelessWidget {
             bottomLeft: Radius.circular(20),
             bottomRight: Radius.circular(6),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.18),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: SelectionArea(
           child: Text(
@@ -66,7 +74,7 @@ class _AiBubble extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // 错误样式
+    // 错误样式（轻松友好的提示）
     if (message.isError) {
       return Align(
         alignment: Alignment.centerLeft,
@@ -75,19 +83,33 @@ class _AiBubble extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: scheme.errorContainer.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.error_outline,
-                  size: 18, color: scheme.error),
+              const Icon(Icons.error_outline,
+                  size: 18, color: Colors.orangeAccent),
               const SizedBox(width: 8),
               Flexible(
-                child: Text(
-                  message.content,
-                  style: TextStyle(fontSize: 14, color: scheme.onErrorContainer),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '哎呀，出了点小问题',
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onErrorContainer),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      message.content,
+                      style: TextStyle(
+                          fontSize: 13, color: scheme.onErrorContainer),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -102,16 +124,14 @@ class _AiBubble extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Avatar(isDark: isDark),
+          ModelAvatar(model: message.model ?? '', size: 32),
           const SizedBox(width: 10),
           Flexible(
             child: Container(
               margin: const EdgeInsets.only(right: 24, top: 6, bottom: 6),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
               decoration: BoxDecoration(
-                color: isDark
-                    ? scheme.surfaceContainerHigh
-                    : Colors.white,
+                color: isDark ? scheme.surfaceContainerHigh : Colors.white,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(6),
                   topRight: Radius.circular(20),
@@ -123,10 +143,30 @@ class _AiBubble extends StatelessWidget {
                       ? Colors.white.withValues(alpha: 0.06)
                       : Colors.black.withValues(alpha: 0.04),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 模型小标签
+                  if (message.model != null && message.model!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Text(
+                        message.model!,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
                   if (message.content.isEmpty && message.isStreaming)
                     const _TypingIndicator()
                   else
@@ -155,31 +195,6 @@ class _AiBubble extends StatelessWidget {
   }
 }
 
-/// 圆形 AI 头像
-class _Avatar extends StatelessWidget {
-  final bool isDark;
-  const _Avatar({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 30,
-      height: 30,
-      margin: const EdgeInsets.only(top: 6),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.brandGradientStart, AppColors.brandGradientEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: const Icon(Icons.auto_awesome, size: 15, color: Colors.white),
-    );
-  }
-}
-
 /// 三点闪烁打字指示器（无文字时）
 class _TypingIndicator extends StatefulWidget {
   const _TypingIndicator();
@@ -195,9 +210,9 @@ class _TypingIndicatorState extends State<_TypingIndicator>
   @override
   void initState() {
     super.initState();
-    _controller =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
-          ..repeat();
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900))
+      ..repeat();
   }
 
   @override
