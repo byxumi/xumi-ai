@@ -19,6 +19,9 @@ dependencies:
   # 本地持久化
   shared_preferences: ^2.2.3
 
+  # Agent 框架（工具/记忆/上下文压缩）
+  dart_agent_core: ^2.1.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
