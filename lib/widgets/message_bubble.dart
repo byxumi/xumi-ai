@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../models/chat_conversation.dart';
 import '../theme/app_theme.dart';
@@ -169,7 +170,7 @@ class _AiBubble extends StatelessWidget {
                     ),
                   if (message.content.isEmpty && message.isStreaming)
                     const _TypingIndicator()
-                  else
+                  else if (message.isStreaming)
                     SelectionArea(
                       child: Text(
                         message.content,
@@ -179,6 +180,11 @@ class _AiBubble extends StatelessWidget {
                           color: scheme.onSurface,
                         ),
                       ),
+                    )
+                  else
+                    _MarkdownContent(
+                      text: message.content,
+                      isDark: isDark,
                     ),
                   if (message.isStreaming && message.content.isNotEmpty)
                     const Padding(
@@ -266,6 +272,41 @@ class _TypingIndicatorLine extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.primary,
         borderRadius: BorderRadius.circular(2),
+      ),
+    );
+  }
+}
+
+/// Markdown 渲染内容（代码块/表格/列表），跟随明暗主题
+class _MarkdownContent extends StatelessWidget {
+  final String text;
+  final bool isDark;
+  const _MarkdownContent({required this.text, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return MarkdownBody(
+      data: text,
+      selectable: true,
+      styleSheet: MarkdownStyleSheet(
+        p: TextStyle(fontSize: 15.5, height: 1.5, color: scheme.onSurface),
+        code: TextStyle(
+          fontSize: 13.5,
+          backgroundColor: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.05),
+        ),
+        codeblockDecoration: BoxDecoration(
+          color: isDark
+              ? Colors.black.withValues(alpha: 0.35)
+              : Colors.grey.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        blockquoteDecoration: BoxDecoration(
+          color: scheme.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6),
+        ),
       ),
     );
   }

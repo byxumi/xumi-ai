@@ -11,11 +11,15 @@ class SettingsService {
   static const _kActiveProfileId = 'active_profile_id_v1';
   static const _kActiveModel = 'active_model_v1';
   static const _kThemeMode = 'theme_mode_v1';
+  static const _kAgentEnabled = 'agent_enabled_v1';
+  static const _kSearchApiKey = 'search_api_key_v1';
 
   List<AiProfile> _profiles = [];
   String _activeProfileId = '';
   String _activeModel = '';
   String _themeMode = 'system'; // system | light | dark
+  bool _agentEnabled = false;
+  String _searchApiKey = '';
 
   SharedPreferences? _prefs;
 
@@ -23,6 +27,8 @@ class SettingsService {
   String get activeProfileId => _activeProfileId;
   String get activeModel => _activeModel;
   String get themeMode => _themeMode;
+  bool get agentEnabled => _agentEnabled;
+  String get searchApiKey => _searchApiKey;
 
   AiProfile? get activeProfile {
     if (_activeProfileId.isEmpty) return null;
@@ -59,6 +65,8 @@ class SettingsService {
     _activeProfileId = _prefs!.getString(_kActiveProfileId) ?? '';
     _activeModel = _prefs!.getString(_kActiveModel) ?? '';
     _themeMode = _prefs!.getString(_kThemeMode) ?? 'system';
+    _agentEnabled = _prefs!.getBool(_kAgentEnabled) ?? false;
+    _searchApiKey = _prefs!.getString(_kSearchApiKey) ?? '';
   }
 
   Future<void> saveProfiles(List<AiProfile> profiles) async {
@@ -80,5 +88,15 @@ class SettingsService {
   Future<void> saveThemeMode(String mode) async {
     _themeMode = mode;
     await _prefs?.setString(_kThemeMode, mode);
+  }
+
+  Future<void> saveAgentEnabled(bool enabled) async {
+    _agentEnabled = enabled;
+    await _prefs?.setBool(_kAgentEnabled, enabled);
+  }
+
+  Future<void> saveSearchApiKey(String key) async {
+    _searchApiKey = key;
+    await _prefs?.setString(_kSearchApiKey, key);
   }
 }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/ai_profile.dart';
+import '../models/chat_conversation.dart';
 import '../provider/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/model_avatar.dart';
@@ -53,6 +55,11 @@ class SettingsScreen extends StatelessWidget {
                   onEdit: () => _openProfileEditor(context, app, profile: p),
                   onDelete: () => _confirmDelete(context, app, p),
                 )),
+          const SizedBox(height: 24),
+          // Agent 能力
+          Text('Agent 能力', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: scheme.onSurface)),
+          const SizedBox(height: 8),
+          _AgentSection(app: app),
           const SizedBox(height: 24),
           // 主题设置
           Text('外观', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: scheme.onSurface)),
@@ -388,6 +395,140 @@ class _ThemeOption extends StatelessWidget {
   }
 }
 
+/// Agent 能力设置区块（工具/记忆/联网搜索入口/导出）
+class _AgentSection extends StatelessWidget {
+  final AppState app;
+  const _AgentSection({required this.app});
+
+  Future<void> _showMemory(BuildContext context) async {
+    final mem = app.memory;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🧠 我的记忆'),
+        content: SingleChildScrollView(
+          child: Text(
+            mem.listAll(),
+            style: const TextStyle(fontSize: 14, height: 1.6),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await mem.clearAll();
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('清空全部'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportConversation(BuildContext context) async {
+    final app = context.read<AppState>();
+    final conv = app.activeConversation;
+    final msgs = app.activeMessages;
+    if (conv == null) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('还没有可导出的对话')));
+      return;
+    }
+    final sb = StringBuffer();
+    sb.writeln('# 对话：' + conv.title);
+    sb.writeln();
+    for (final m in msgs) {
+      final who = m.role == ChatRole.user ? '我' : '须弥AI';
+      sb.writeln('**' + who + '**：');
+      sb.writeln(m.content);
+      sb.writeln();
+    }
+    final text = sb.toString();
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('已复制会话到剪贴板 📋')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final agentOn = app.agentEnabled;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? scheme.surfaceContainer : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Agent 模式',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            subtitle: const Text('开启后自动调用工具（计算器/时间/记忆），更聪明',
+                style: TextStyle(fontSize: 12)),
+            value: agentOn,
+            onChanged: (v) => app.setAgentEnabled(v),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.psychology_outlined, size: 20),
+            title: const Text('长期记忆', style: TextStyle(fontSize: 14)),
+            subtitle: Text(
+              app.memory.all.isEmpty
+                  ? '还没有记住什么'
+                  : '已记住 ' + app.memory.all.length.toString() + ' 条',
+              style: TextStyle(fontSize: 12, color: scheme.outline),
+            ),
+            trailing: const Icon(Icons.chevron_right, size: 20),
+            onTap: () => _showMemory(context),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.ios_share, size: 20),
+            title: const Text('导出当前对话', style: TextStyle(fontSize: 14)),
+            subtitle: const Text('复制为 Markdown 文本', style: TextStyle(fontSize: 12)),
+            trailing: const Icon(Icons.chevron_right, size: 20),
+            onTap: () => _exportConversation(context),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: TextField(
+              controller: TextEditingController(text: app.searchApiKey),
+              obscureText: true,
+              onSubmitted: (v) => app.setSearchApiKey(v.trim()),
+              decoration: InputDecoration(
+                hintText: '搜索 API Key（可选，联网搜索用）',
+                prefixIcon: const Icon(Icons.travel_explore, size: 19),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '大多数模型自带联网能力，通常不用填～',
+            style: TextStyle(fontSize: 11, color: scheme.outline),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// 关于卡片
 class _AboutCard extends StatelessWidget {
   final bool isDark;
@@ -416,7 +557,7 @@ class _AboutCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '版本 2.1.0 · 接入你自己的 AI 接口',
+            '版本 3.0.0 · 接入你自己的 AI 接口',
             style: TextStyle(fontSize: 12, color: scheme.outline),
           ),
           const SizedBox(height: 4),

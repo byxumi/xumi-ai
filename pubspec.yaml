@@ -1,7 +1,7 @@
 name: xumi_ai
 description: 须弥AI —— 轻快好用的多模型 AI 聊天助手，支持多个 OpenAI 兼容 API 接口自由切换（DeepSeek / 豆包 / 自定义）。
 publish_to: "none"
-version: 2.1.0+2
+version: 3.0.0+3
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -18,6 +18,12 @@ dependencies:
 
   # 本地持久化
   shared_preferences: ^2.2.3
+
+  # Markdown 渲染
+  flutter_markdown: ^0.7.7+1
+
+  # Agent 框架（工具/记忆/上下文压缩）
+  dart_agent_core: ^2.1.6
 
 dev_dependencies:
   flutter_test:
