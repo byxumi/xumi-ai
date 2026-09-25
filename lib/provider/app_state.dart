@@ -1,6 +1,7 @@
 import 'dart:math';
 
-import 'package:dart_agent_core/dart_agent_core.dart';
+import 'package:dart_agent_core/dart_agent_core.dart'
+    hide OpenAIClient;
 import 'package:flutter/foundation.dart';
 
 import '../models/ai_profile.dart';
