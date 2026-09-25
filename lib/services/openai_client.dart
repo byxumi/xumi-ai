@@ -16,6 +16,9 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// SSE 解析结果
+enum SseResult { continue_reading, done }
+
 /// OpenAI 兼容 Chat Completions 客户端
 /// 支持 SSE 流式输出
 class OpenAIClient {
@@ -91,32 +94,27 @@ class OpenAIClient {
         ),
       );
 
-      final stream = resp.data!.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter());
-
+      // SSE 流式解析：逐行读取，行可能跨多个网络 chunk，需缓存不完整尾部
       final buffer = StringBuffer();
-      await for (final line in stream) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty) continue;
-        if (trimmed.startsWith('data:')) {
-          final payload = trimmed.substring(5).trim();
-          if (payload == '[DONE]') break;
-          try {
-            final json = jsonDecode(payload) as Map<String, dynamic>;
-            final choices = json['choices'] as List<dynamic>? ?? [];
-            if (choices.isEmpty) continue;
-            final first = choices.first as Map<String, dynamic>;
-            final delta =
-                (first['delta'] as Map<String, dynamic>?)?['content'];
-            if (delta is String && delta.isNotEmpty) {
-              buffer.write(delta);
-              onDelta(delta);
-            }
-          } catch (_) {
-            // 忽略无法解析的 chunk
+      var leftover = '';
+      await for (final chunk in resp.data!.stream) {
+        leftover += utf8.decode(chunk, allowMalformed: true);
+        final lines = leftover.split('\n');
+        if (lines.isNotEmpty) {
+          leftover = lines.removeLast();
+        }
+        var stopped = false;
+        for (final rawLine in lines) {
+          if (_parseSseLine(rawLine, buffer, onDelta) == SseResult.done) {
+            stopped = true;
+            break;
           }
         }
+        if (stopped) break;
+      }
+      // 处理最后一个无换行的 chunk
+      if (leftover.trim().isNotEmpty) {
+        _parseSseLine(leftover, buffer, onDelta);
       }
       onDone(buffer.toString());
     } on DioException catch (e) {
@@ -125,6 +123,31 @@ class OpenAIClient {
     } catch (e) {
       onError('请求失败：$e');
     }
+  }
+
+  /// 解析一行 SSE 数据，返回是否到达 [DONE]
+  SseResult _parseSseLine(
+      String line, StringBuffer buffer, void Function(String) onDelta) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty || !trimmed.startsWith('data:')) {
+      return SseResult.continue_reading;
+    }
+    final payload = trimmed.substring(5).trim();
+    if (payload == '[DONE]') return SseResult.done;
+    try {
+      final json = jsonDecode(payload) as Map<String, dynamic>;
+      final choices = json['choices'] as List<dynamic>? ?? [];
+      if (choices.isEmpty) return SseResult.continue_reading;
+      final first = choices.first as Map<String, dynamic>;
+      final delta = (first['delta'] as Map<String, dynamic>?)?['content'];
+      if (delta is String && delta.isNotEmpty) {
+        buffer.write(delta);
+        onDelta(delta);
+      }
+    } catch (_) {
+      // 忽略无法解析的 chunk
+    }
+    return SseResult.continue_reading;
   }
 
   /// 把 DioException 转成友好错误信息
