@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:dart_agent_core/dart_agent_core.dart';
 
 import '../models/ai_profile.dart';
@@ -82,14 +81,14 @@ class AgentService {
   static double _evaluate(String src) {
     final p = _ExprParser(src);
     final v = p.parseAdd();
-    if (!p.atEnd) throw FormatException('多余字符');
+    if (!p.atEnd) throw const FormatException('多余字符');
     return v;
   }
 
   /// 一次 Agent 对话：把 runStream 的 StreamingEvent 映射成 UI 事件流
   Stream<AgentStreamEvent> chatStream(String userText) {
     final sb = StringBuffer();
-    return _agent.runStream([UserMessage(content: userText)]).map((event) {
+    return _agent.runStream([UserMessage.text(userText)]).map((event) {
       switch (event.eventType) {
         case StreamingEventType.modelChunkMessage:
           final t = event.data as String;
@@ -107,8 +106,8 @@ class AgentService {
 
   /// 把状态（含历史/记忆）持久化到本地
   Future<void> saveState() async {
-    final storage = FileStateStorage();
-    await storage.save(sessionId, state);
+    final storage = FileStateStorage('agent_state');
+    await storage.save(state);
   }
 }
 
@@ -123,9 +122,15 @@ class _ExprParser {
     var v = parseMul();
     while (pos < src.length) {
       final c = src[pos];
-      if (c == '+') { pos++; v += parseMul(); }
-      else if (c == '-') { pos++; v -= parseMul(); }
-      else break;
+      if (c == '+') {
+        pos++;
+        v += parseMul();
+      } else if (c == '-') {
+        pos++;
+        v -= parseMul();
+      } else {
+        break;
+      }
     }
     return v;
   }
@@ -134,9 +139,15 @@ class _ExprParser {
     var v = parseAtom();
     while (pos < src.length) {
       final c = src[pos];
-      if (c == '*') { pos++; v *= parseAtom(); }
-      else if (c == '/') { pos++; v /= parseAtom(); }
-      else break;
+      if (c == '*') {
+        pos++;
+        v *= parseAtom();
+      } else if (c == '/') {
+        pos++;
+        v /= parseAtom();
+      } else {
+        break;
+      }
     }
     return v;
   }
@@ -149,7 +160,9 @@ class _ExprParser {
       return v;
     }
     final start = pos;
-    while (pos < src.length && (_digit(src[pos]) || src[pos] == '.')) pos++;
+    while (pos < src.length && (_digit(src[pos]) || src[pos] == '.')) {
+      pos++;
+    }
     if (start == pos) throw const FormatException('非法数字');
     return double.parse(src.substring(start, pos));
   }
@@ -159,7 +172,3 @@ class _ExprParser {
     return u >= 48 && u <= 57;
   }
 }
-
-/// 让 unused 提示不干扰（阶段0 预留）
-// ignore: unused_element
-String _tempMathNote() => Random().nextBool().toString();
