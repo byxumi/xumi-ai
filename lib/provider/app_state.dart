@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:dart_agent_core/dart_agent_core.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/ai_profile.dart';
@@ -300,6 +301,9 @@ class AppState extends ChangeNotifier {
   /// 按会话缓存的 Agent（保持上下文连续性）
   final Map<String, AgentService> _agents = {};
 
+  /// 已注入 Agent 历史的用户消息（按会话去重）
+  final Map<String, Set<String>> _injectedHistory = {};
+
   /// Agent 模式发送：走 dart_agent_core（工具调用 + 记忆 + 上下文）
   Future<void> _sendAgent(
     String convId,
@@ -321,20 +325,17 @@ class AppState extends ChangeNotifier {
       ),
     );
 
-    // 预注入本会话历史（仅最近若干条，控制上下文体积）
+    // 预注入本会话历史（仅最近若干条，控制上下文体积；按内容去重）
     final recent = history.length > 10
         ? history.sublist(history.length - 10)
         : history;
-    final existingKeys = <String>{};
-    for (final m in agent.state.history.messages) {
-      existingKeys.add('u:' + m.id);
-    }
+    final injected = _injectedHistory.putIfAbsent(convId, () => <String>{});
     for (final m in recent) {
       if (m.role == ChatRole.user && m.content.trim().isNotEmpty) {
-        final key = 'u:' + m.id;
-        if (existingKeys.contains(key)) continue;
-        existingKeys.add(key);
-        agent.state.history.messages.add(UserMessage.text(m.content.trim()));
+        final t = m.content.trim();
+        if (injected.contains(t)) continue;
+        injected.add(t);
+        agent.state.history.messages.add(UserMessage.text(t));
       }
     }
 

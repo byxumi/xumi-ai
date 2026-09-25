@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/ai_profile.dart';
+import '../models/chat_conversation.dart';
 import '../provider/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/model_avatar.dart';
