@@ -1,0 +1,28 @@
+name: xumi_ai
+description: 须弥AI —— 一款简洁流畅的 AI 聊天客户端，支持多个 OpenAI 兼容 API 接口自由切换。
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 状态管理
+  provider: ^6.1.2
+
+  # 网络请求
+  dio: ^5.4.3
+
+  # 本地持久化
+  shared_preferences: ^2.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,21 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+*.iml
+.idea/
+.vscode/
+
+# 敏感信息（本地专用，绝不推送）
+HANDOVER.md
+.ghtoken
+.githtoken
+
+# 签名与工具
+*.jks.bak
+
+# 终端临时推送目录
+.gitpush_tmp/
